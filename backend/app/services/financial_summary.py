@@ -7,12 +7,12 @@ def generate_monthly_summary(df: pd.DataFrame) -> pd.DataFrame:
     summaries = []
 
     for month, group in df.groupby("month"):
-        income = group[group["type"] == "Credit"]["amount"].sum()
-        fixed = group[group["category"].isin(FIXED_CATEGORIES)]["amount"].sum()
-        discretionary = group[
-            (group["type"] == "Debit") &
+        income = group[group["type"].str.lower() == "credit"]["amount"].sum()
+        fixed = abs(group[group["category"].isin(FIXED_CATEGORIES)]["amount"].sum())
+        discretionary = abs(group[
+            (group["type"].str.lower() == "debit") &
             (~group["category"].isin(FIXED_CATEGORIES))
-        ]["amount"].sum()
+        ]["amount"].sum())
 
         savings = income - fixed - discretionary
 
