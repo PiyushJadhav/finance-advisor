@@ -2,7 +2,6 @@ from fastapi import FastAPI
 from app.routes import analyze, health
 from fastapi.middleware.cors import CORSMiddleware
 
-
 app = FastAPI(title="Finance Decision Advisor")
 
 app.add_middleware(

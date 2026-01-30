@@ -1,8 +1,12 @@
 
 from app.services.financial_summary import generate_monthly_summary
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException
-from app.services.transaction_loader import load_transactions
+from app.services.transaction_loader import load_transactions 
 from app.services.simulator import simulate_large_purchase
+from app.services.decision_explainer import decision_explainer
+from app.services.decision_store import save_decision, get_all_decisions
+from app.models.decision_record import DecisionRecord
+from app.services.decision_retriever import retrieve_similar_decisions
 import traceback
 
 
@@ -22,17 +26,40 @@ async def analyze_purchase(
 
         original_savings = summary_df.iloc[0]["savings"] if not summary_df.empty else 0
         new_savings = original_savings - purchase_amount
+        explanation = decision_explainer(purchase_amount,min_balance,new_savings, risk, 500)
 
+        record = DecisionRecord(
+            purchase_amount=purchase_amount,
+            risk_level=risk,
+            lowest_balance=min_balance,
+            savings_change=new_savings,
+            explanation=explanation
+            )  
+
+        save_decision(record)
+
+        
+        past_decisions = get_all_decisions()
+        similar = retrieve_similar_decisions(purchase_amount, past_decisions)
+        
         # Convert numpy types to native Python types for JSON serialization
         return {
             "recommendation": "Proceed" if risk == "Safe" else "Caution" if risk == "Caution" else "Not Recommended",
-            "summary": f"This purchase would result in a {risk.lower()} financial position. Your lowest balance would be ${float(min_balance):.2f}.",
+            "summary": explanation,
             "savings_change": float(new_savings),
             "lowest_balance": float(min_balance),
             "risk_level": risk,
             "projection": [
                 {k: float(v) if isinstance(v, (int, float)) else str(v) for k, v in record.items()}
                 for record in sim_df.to_dict(orient="records")
+            ],
+            "similar_decisions": [
+                {
+                    "purchase_amount": d.purchase_amount,
+                    "risk_level": d.risk_level,
+                    "outcome": d.explanation
+                }
+                for d in similar[:3]
             ]
         }
     except Exception as e:
